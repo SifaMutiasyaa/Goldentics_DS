@@ -140,7 +140,7 @@ Harga Emas (IDR/gram) = Harga Emas Global (USD/OZ) × Kurs USD/IDR ÷ 31.1035
 
 ## Author Data Scientist
 
-**Nama:** Fairuz
+**Nama:** Fairuz Hajar Hanifah
 
 **Email:** [ruzhanifah@gmail.com](mailto:ruzhanifah@gmail.com)
 
