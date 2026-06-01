@@ -1,6 +1,7 @@
 # Gold Price Analytics Dashboard 📈✨
 
 Proyek ini merupakan analisis data harga emas Indonesia yang bertujuan untuk memahami tren harga emas, volatilitas pasar, distribusi harga, serta hubungan antara harga emas global dan nilai tukar USD/IDR. Dashboard dibangun menggunakan Streamlit dan Plotly untuk menyajikan insight bisnis secara interaktif dan mudah dipahami.
+**Dashboard Streamlit:** https://goldenticsds.streamlit.app/
 
 ## Project Structure
 
