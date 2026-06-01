@@ -9,7 +9,7 @@ gold-price-analysis
 │
 ├── dashboard
 │   ├── app.py
-│   └── gold_feature_engineering.csv
+│   └── gold_data_cache.csv
 │
 ├── tambah_eda.ipynb
 ├── README.md
