@@ -5,8 +5,10 @@ import yfinance as yf
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from datetime import datetime
+from datetime import datetime, timedelta
+import os
 
+# Konfigurasi halaman
 st.set_page_config(
     page_title="Gold Price Analytics Dashboard",
     page_icon="📈",
@@ -16,11 +18,7 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* Umum - background terang */
-    .main {
-        background-color: #f8f9fc;
-    }
-    /* Card styling */
+    .main { background-color: #f8f9fc; }
     .css-1r6slb0, .css-1y4p8pa, [data-testid="stMetric"] {
         background-color: white;
         border-radius: 20px;
@@ -34,21 +32,9 @@ st.markdown("""
         border-color: #d4af37;
         box-shadow: 0 8px 20px rgba(212,175,55,0.15);
     }
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background-color: #ffffff;
-        border-right: 1px solid #e6d5a8;
-    }
-    /* Judul */
-    h1, h2, h3 {
-        color: #b8860b;
-        font-weight: 600;
-    }
-    /* Teks umum */
-    body, .stMarkdown, .stText, .stSelectbox label {
-        color: #1e2a3e;
-    }
-    /* Tombol */
+    [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #e6d5a8; }
+    h1, h2, h3 { color: #b8860b; font-weight: 600; }
+    body, .stMarkdown, .stText, .stSelectbox label { color: #1e2a3e; }
     .stButton button {
         background: linear-gradient(90deg, #d4af37, #b8860b);
         color: white;
@@ -56,14 +42,12 @@ st.markdown("""
         border-radius: 30px;
         border: none;
         padding: 0.5rem 1rem;
-        transition: all 0.2s;
     }
     .stButton button:hover {
         background: linear-gradient(90deg, #e6c85c, #d4af37);
         color: #1e2a3e;
         transform: scale(1.02);
     }
-    /* Expander */
     .streamlit-expanderHeader {
         background-color: #fef9e6;
         border-radius: 15px;
@@ -71,13 +55,11 @@ st.markdown("""
         color: #b8860b;
         border: 1px solid #f0e2b6;
     }
-    /* Selectbox */
     .stSelectbox div[data-baseweb="select"] {
         background-color: white;
         border-radius: 12px;
         border: 1px solid #d4af37;
     }
-    /* Info box */
     .info-box {
         background: #fef9e6;
         padding: 1rem;
@@ -86,67 +68,82 @@ st.markdown("""
         margin-bottom: 1rem;
         color: #1e2a3e;
     }
-    /* Dataframe */
-    .dataframe {
-        font-size: 12px;
-        border-radius: 12px;
-        background: white;
-    }
-    /* Metric label */
-    [data-testid="stMetricLabel"] {
-        color: #5a6e7c;
-    }
-    [data-testid="stMetricValue"] {
-        color: #b8860b;
-        font-weight: bold;
-    }
+    .dataframe { font-size: 12px; border-radius: 12px; background: white; }
+    [data-testid="stMetricLabel"] { color: #5a6e7c; }
+    [data-testid="stMetricValue"] { color: #b8860b; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
-# ======================= LOAD DATA =======================
-@st.cache_data(ttl=3600)
+# ======================= LOAD DATA DENGAN FALLBACK CACHE =======================
+DATA_CACHE_FILE = "gold_data_cache.csv"
+
+@st.cache_data(ttl=86400)
 def load_data():
-    gold = yf.download("GC=F", period="10y", interval="1d", auto_adjust=True)
-    usd = yf.download("IDR=X", period="10y", interval="1d", auto_adjust=True)
-
-    df = pd.DataFrame()
-    df["Gold_USD_OZ"] = gold["Close"]
-    df["USDIDR"] = usd["Close"]
-    df = df.dropna()
-
-    # Konversi ke harga per gram dalam Rupiah
-    df["Close"] = (df["Gold_USD_OZ"] * df["USDIDR"]) / 31.1035
-    df.reset_index(inplace=True)
-    df.rename(columns={"index": "Date"}, inplace=True)
-
-    # Fitur tambahan
-    df["Return_1D"] = df["Close"].pct_change()
-    df["MA7"] = df["Close"].rolling(7).mean()
-    df["MA30"] = df["Close"].rolling(30).mean()
-    df["Volatility30"] = df["Return_1D"].rolling(30).std()
-    df["Upper_BB"] = df["MA30"] + 2 * df["Close"].rolling(30).std()
-    df["Lower_BB"] = df["MA30"] - 2 * df["Close"].rolling(30).std()
-    df["Year"] = df["Date"].dt.year
-    df["Month"] = df["Date"].dt.month
-    return df
+    # Coba download dari Yahoo Finance
+    try:
+        with st.spinner("Mengunduh data dari Yahoo Finance..."):
+            gold = yf.download("GC=F", period="10y", interval="1d", auto_adjust=True, progress=False)
+            usd = yf.download("IDR=X", period="10y", interval="1d", auto_adjust=True, progress=False)
+            if gold.empty or usd.empty:
+                raise ValueError("Data kosong dari Yahoo Finance")
+            df = pd.DataFrame()
+            df["Gold_USD_OZ"] = gold["Close"]
+            df["USDIDR"] = usd["Close"]
+            df = df.dropna()
+            df["Close"] = (df["Gold_USD_OZ"] * df["USDIDR"]) / 31.1035
+            df.reset_index(inplace=True)
+            df.rename(columns={"index": "Date"}, inplace=True)
+            df["Return_1D"] = df["Close"].pct_change()
+            df["MA7"] = df["Close"].rolling(7).mean()
+            df["MA30"] = df["Close"].rolling(30).mean()
+            df["Volatility30"] = df["Return_1D"].rolling(30).std()
+            df["Upper_BB"] = df["MA30"] + 2 * df["Close"].rolling(30).std()
+            df["Lower_BB"] = df["MA30"] - 2 * df["Close"].rolling(30).std()
+            df["Year"] = df["Date"].dt.year
+            df["Month"] = df["Date"].dt.month
+            # Simpan cache
+            df.to_csv(DATA_CACHE_FILE, index=False)
+            return df
+    except Exception as e:
+        st.warning(f"Gagal mengunduh data dari Yahoo Finance: {e}")
+        # Coba baca dari file cache
+        if os.path.exists(DATA_CACHE_FILE):
+            try:
+                df = pd.read_csv(DATA_CACHE_FILE)
+                df["Date"] = pd.to_datetime(df["Date"])
+                st.info("✅ Menggunakan data cache terakhir.")
+                return df
+            except Exception as ex:
+                st.error(f"Gagal membaca cache: {ex}")
+        else:
+            st.error("❌ Tidak ada data cache. Silakan coba lagi nanti atau upload file CSV.")
+        return pd.DataFrame()
 
 df_raw = load_data()
 
+# ======================= VALIDASI DATA =======================
+if df_raw.empty:
+    st.stop()
+
 # ======================= SIDEBAR FILTER =======================
 st.sidebar.title("🔍 Filter Data")
-min_date = df_raw["Date"].min().date()
-max_date = df_raw["Date"].max().date()
-date_range = st.sidebar.date_input(
-    "📅 Rentang Waktu",
-    value=(min_date, max_date),
-    min_value=min_date,
-    max_value=max_date
-)
+min_date_ts = df_raw["Date"].min()
+max_date_ts = df_raw["Date"].max()
+if pd.notna(min_date_ts) and pd.notna(max_date_ts):
+    min_date = min_date_ts.date()
+    max_date = max_date_ts.date()
+else:
+    min_date = datetime.today().date() - timedelta(days=365)
+    max_date = datetime.today().date()
+date_range = st.sidebar.date_input("📅 Rentang Waktu", value=(min_date, max_date), min_value=min_date, max_value=max_date)
 if len(date_range) == 2:
     start_date, end_date = date_range
     df = df_raw[(df_raw["Date"].dt.date >= start_date) & (df_raw["Date"].dt.date <= end_date)]
 else:
     df = df_raw
+if df.empty:
+    st.warning("⚠️ Tidak ada data untuk rentang tanggal yang dipilih. Silakan pilih rentang lain.")
+    st.stop()
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚙️ Parameter")
@@ -171,6 +168,7 @@ menu = st.sidebar.selectbox(
     ]
 )
 
+# ======================= HELPER FUNCTIONS =======================
 def make_light_fig(fig, title=""):
     fig.update_layout(
         template="plotly_white",
@@ -184,6 +182,7 @@ def make_light_fig(fig, title=""):
     )
     return fig
 
+# ======================= PAGE CONTENT =======================
 if menu == "🏠 Executive Summary":
     st.title("✨ Gold Price Analytics Dashboard")
     st.markdown("""
@@ -224,14 +223,7 @@ elif menu == "📈 Tren Harga Emas":
     
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df["Date"], y=df["Close"], mode="lines", name="Harga Emas", line=dict(color="#d4af37", width=2.5)))
-    # Perbaikan: menggunakan pd.Timestamp untuk x0
-    fig.add_vrect(
-        x0=pd.Timestamp("2024-01-01"),
-        x1=df["Date"].max(),
-        fillcolor="rgba(212,175,55,0.1)",
-        line_width=0,
-        annotation_text="Percepatan Kenaikan"
-    )
+    fig.add_vrect(x0=pd.Timestamp("2024-01-01"), x1=df["Date"].max(), fillcolor="rgba(212,175,55,0.1)", line_width=0, annotation_text="Percepatan Kenaikan")
     fig = make_light_fig(fig, "")
     fig.update_xaxes(title_text="Tanggal")
     fig.update_yaxes(title_text="Harga (Rp/gram)")
