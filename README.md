@@ -12,7 +12,7 @@ gold-price-analysis
 │   ├── app.py
 │   └── gold_data_cache.csv
 │
-├── tambah_eda.ipynb
+├── Goldentics_DS.ipynb
 ├── README.md
 ├── requirements.txt
 └── url.txt
