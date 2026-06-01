@@ -5,8 +5,9 @@ import yfinance as yf
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from datetime import datetime
+from datetime import datetime, timedelta
 
+# Konfigurasi halaman
 st.set_page_config(
     page_title="Gold Price Analytics Dashboard",
     page_icon="📈",
@@ -132,21 +133,37 @@ def load_data():
 
 df_raw = load_data()
 
-# ======================= SIDEBAR FILTER =======================
 st.sidebar.title("🔍 Filter Data")
-min_date = df_raw["Date"].min().date()
-max_date = df_raw["Date"].max().date()
+
+# AMAN: pastikan min_date dan max_date tidak NaT
+min_date_ts = df_raw["Date"].min()
+max_date_ts = df_raw["Date"].max()
+
+if pd.notna(min_date_ts) and pd.notna(max_date_ts):
+    min_date = min_date_ts.date()
+    max_date = max_date_ts.date()
+else:
+    # fallback jika data kosong
+    min_date = datetime.today().date() - timedelta(days=365)
+    max_date = datetime.today().date()
+
 date_range = st.sidebar.date_input(
     "📅 Rentang Waktu",
     value=(min_date, max_date),
     min_value=min_date,
     max_value=max_date
 )
+
 if len(date_range) == 2:
     start_date, end_date = date_range
     df = df_raw[(df_raw["Date"].dt.date >= start_date) & (df_raw["Date"].dt.date <= end_date)]
 else:
     df = df_raw
+
+# Jika setelah filter data kosong, tampilkan peringatan
+if df.empty:
+    st.warning("⚠️ Tidak ada data untuk rentang tanggal yang dipilih. Silakan pilih rentang lain.")
+    st.stop()
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚙️ Parameter")
@@ -224,7 +241,7 @@ elif menu == "📈 Tren Harga Emas":
     
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df["Date"], y=df["Close"], mode="lines", name="Harga Emas", line=dict(color="#d4af37", width=2.5)))
-    # Perbaikan: menggunakan pd.Timestamp untuk x0
+    # Pastikan x0 sebagai Timestamp, x1 juga Timestamp (aman)
     fig.add_vrect(
         x0=pd.Timestamp("2024-01-01"),
         x1=df["Date"].max(),
