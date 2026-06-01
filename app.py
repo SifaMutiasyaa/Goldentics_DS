@@ -16,6 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ======================= CUSTOM CSS (LIGHT THEME + GOLD ACCENT) =======================
 st.markdown("""
 <style>
     .main { background-color: #f8f9fc; }
